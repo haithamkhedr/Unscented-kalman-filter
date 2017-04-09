@@ -67,10 +67,6 @@ UKF::UKF() {
   R_lidar(0,0) = std_laspx_;
   R_lidar(1,1) = std_laspy_;
 
-
- 
-  
-
 }
 
 UKF::~UKF() {}
@@ -96,8 +92,17 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       }
 
       else if(meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == true){
-          x_(0) = meas_package.raw_measurements_[0];
-          x_(1) = meas_package.raw_measurements_[0];
+          
+          float px = meas_package.raw_measurements_[0];
+          float py = meas_package.raw_measurements_[1];
+          
+          if(px == 0)
+              px = 1e-5;
+          if(py == 0)
+              py = 1e-5;
+          
+          x_(0) = px ;
+          x_(1) = py;
           x_(2) = 0;
           x_(3) = 0;
           x_(4) = 0;
@@ -130,11 +135,20 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
  */
 void UKF::Prediction(double delta_t) {
   /**
-  TODO:
+  TODO
 
   Complete this function! Estimate the object's location. Modify the state
   vector, x_. Predict sigma points, the state, and the state covariance matrix.
   */
+     //create augmented state
+  VectorXd x_aug = VectorXd(n_aug_);
+  x_aug.head(n_x_) = x_;
+  x_aug(n_x_) = 0;
+  x_aug(n_x_ + 1) = 0;
+  
+  //Generate Sigma points 
+  //Predict mean and covariance of sigma points 
+  //predict state
 }
 
 /**
