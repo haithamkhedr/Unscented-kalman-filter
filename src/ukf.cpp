@@ -1,6 +1,7 @@
 #include "ukf.h"
 #include "tools.h"
 #include "Eigen/Dense"
+#include "math.h"
 #include <iostream>
 
 using namespace std;
@@ -13,6 +14,7 @@ using std::vector;
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
+  is_initialized_ = false;
   use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
@@ -78,19 +80,47 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
-  /**
-  TODO:
-  if(meas_package.senor_type_ == MeasurementPackage::RADAR && use_radar_ == true){
-  
+ 
+  if(! is_initialized_){
+      if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == true){
+          
+          float rho = meas_package.raw_measurements_[0];
+          float phi = meas_package.raw_measurements_[1];
+          float rhodot = meas_package.raw_measurements_[2];
+
+          x_(0) = rho * cos(phi);
+          x_(1) = rho * sin(phi);
+          x_(2) = rhodot;
+          x_(3) = phi;
+          x_(4) = 0;
+      }
+
+      else if(meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == true){
+          x_(0) = meas_package.raw_measurements_[0];
+          x_(1) = meas_package.raw_measurements_[0];
+          x_(2) = 0;
+          x_(3) = 0;
+          x_(4) = 0;
+      }
+      is_initialized_ = true;
+      time_us_ = meas_package.timestamp_;
+      return;
   }
-
-  else if(meas_package.senor_type_ == MeasurementPackage::LASER && use_laser_ == true){
-
-  }
-
-  Complete this function! Make sure you switch between lidar and radar
-  measurements.
-  */
+    
+   double dt = meas_package.timestamp_ - time_us_;
+   if( use_radar_ || use_laser_ ){
+       Prediction(dt);
+       
+       if(meas_package.sensor_type_ == MeasurementPackage::RADAR){
+           UpdateRadar(meas_package);
+       }
+        if(meas_package.sensor_type_ == MeasurementPackage::LASER){
+           UpdateLidar(meas_package);
+       }
+   }
+    
+   time_us_ = meas_package.timestamp_;
+ 
 }
 
 /**
