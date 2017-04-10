@@ -30,12 +30,22 @@ UKF::UKF() {
 
   // initial covariance matrix
   P_ = MatrixXd(n_x_, n_x_);
+  P_.fill(0);
+  P_(0,0) = 1;
+  P_(1,1) = 1;
+  P_(2,2) = 1000;
+  P_(3,3) = 1000;
+  P_(4,4) = 1000;
+
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 30;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = 30;
+  Q_  = MatrixXd(2,2);
+  Q_ << std_a_ , 0,
+       0     , std_yawdd_ ;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -66,6 +76,12 @@ UKF::UKF() {
   R_radar(2,2) = std_radrd_;
   R_lidar(0,0) = std_laspx_;
   R_lidar(1,1) = std_laspy_;
+
+  weights_ = VectorXd(2 * n_aug_ +1);
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
+  for(int i=1 ; i < 2*n_aug_ + 1; i++){
+      weights_(i) = 0.5/(lambda_ + n_aug_);
+  }
 
 }
 
@@ -142,13 +158,28 @@ void UKF::Prediction(double delta_t) {
   */
      //create augmented state
   VectorXd x_aug = VectorXd(n_aug_);
+  MatrixXd sig_points = MatrixXd(n_aug_, 2*n_aug_ +1);
+  MatrixXd pred_sig_points = MatrixXd(n_x_, 2*n_aug_ +1);
   x_aug.head(n_x_) = x_;
   x_aug(n_x_) = 0;
   x_aug(n_x_ + 1) = 0;
-  
-  //Generate Sigma points 
-  //Predict mean and covariance of sigma points 
-  //predict state
+  generateSigmaPoints(x_aug , sig_points);
+  predictSigmaPoints(sig_points , pred_sig_points , delta_t);
+  //calculate the mean
+  x_.fill(0);
+  for(int i = 0 ; i < weights_.size() ; i++){
+    x_ += weights_(i) * pred_sig_points.col(i);
+  }
+  //calculate co-variance
+  P_.fill(0);
+  for(int i =0; i < weights_.size(); i++){
+      VectorXd diff = pred_sig_points.col(i)  - x_;
+      //normalize angles
+      while(diff(3) > M_PI) diff(3) -= 2.0*M_PI;
+      while(diff(3) < -M_PI) diff(3) += 2.0*M_PI;
+      
+      P_ += weights_(i) * diff * diff.transpose();
+  }
 }
 
 /**
@@ -179,4 +210,50 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
   */
+}
+void UKF::generateSigmaPoints(const VectorXd x_aug , MatrixXd &sig_points){
+    MatrixXd p_aug = MatrixXd(n_aug_ , n_aug_);
+    p_aug.fill(0);
+    p_aug.topLeftCorner(n_x_,n_x_) = P_;
+    p_aug(n_x_,n_x_) = std_a_ * std_a_ ; 
+    p_aug(n_x_+1,n_x_+1) = std_yawdd_ * std_yawdd_ ; 
+
+    MatrixXd L = p_aug.llt().matrixL();
+
+    sig_points.col(0) = x_aug;
+    double scale = sqrt(lambda_ + n_x_);
+
+    for(int i = 0; i<n_aug_; i++){
+        sig_points.col(1 + i) = x_aug + scale * L.col(i);
+        sig_points.col(1 + i + n_aug_) = x_aug - scale * L.col(i);
+    }
+
+
+}
+void UKF::predictSigmaPoints(const MatrixXd& sig_points , MatrixXd& pred_sig_points, double dt){
+    for(int i = 0; i < 2 * n_aug_ + 1; i++){
+
+        double px = sig_points(0,i); 
+        double py = sig_points(1,i); 
+        double v = sig_points(2,i);
+        double phi = sig_points(3,i);
+        double phi_dot = sig_points(4,i);
+        double nu_a = sig_points(5,i);
+        double nu_yaw = sig_points(6,i);
+
+        if(fabs(phi_dot) > 0.001){
+            pred_sig_points(0,i) = px + (v/phi_dot) * (sin(phi + phi_dot *dt) - sin(phi) ) + 0.5*dt*dt*cos(phi) * nu_a ;
+            pred_sig_points(1,i) = py + (v/phi_dot) * (cos(phi) - cos(phi + phi_dot * dt)) + 0.5*dt*dt*sin(phi) * nu_a;
+        }
+        else{
+
+            pred_sig_points(0,i) = px + v * cos(phi) * dt + 0.5 * dt * dt * cos(phi) * nu_a;
+            pred_sig_points(1,i) = py + v * sin(phi) * dt + 0.5 * dt * dt * sin(phi) * nu_a;
+            
+        }
+
+        pred_sig_points(2,i) = v + dt * nu_a;
+        pred_sig_points(3,i) = phi + dt * phi_dot + 0.5 * dt * dt * nu_yaw;
+        pred_sig_points(4,i) = phi_dot + dt * nu_yaw;
+    } 
 }

@@ -40,6 +40,7 @@ public:
 
   ///* Process noise standard deviation yaw acceleration in rad/s^2
   double std_yawdd_;
+  MatrixXd Q_;
 
   ///* Laser measurement noise standard deviation position1 in m
   double std_laspx_;
@@ -113,6 +114,10 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+
+private:
+  void generateSigmaPoints(const VectorXd x_aug , MatrixXd &sig_points);
+  void predictSigmaPoints(const MatrixXd& sig_points , MatrixXd& pred_sig_points , double dt);
 };
 
 #endif /* UKF_H */
