@@ -26,7 +26,7 @@ UKF::UKF() {
 
   // initial state vector
   x_ = VectorXd(n_x_);
-  Xsig_pred_ = Eigen::MatrixXd(n_aug_,2*n_x_ +1);
+  Xsig_pred_ = Eigen::MatrixXd(n_x_,2*n_aug_ +1);
 
   // initial covariance matrix
   P_ = MatrixXd(n_x_, n_x_);
@@ -159,21 +159,20 @@ void UKF::Prediction(double delta_t) {
      //create augmented state
   VectorXd x_aug = VectorXd(n_aug_);
   MatrixXd sig_points = MatrixXd(n_aug_, 2*n_aug_ +1);
-  MatrixXd pred_sig_points = MatrixXd(n_x_, 2*n_aug_ +1);
   x_aug.head(n_x_) = x_;
   x_aug(n_x_) = 0;
   x_aug(n_x_ + 1) = 0;
   generateSigmaPoints(x_aug , sig_points);
-  predictSigmaPoints(sig_points , pred_sig_points , delta_t);
+  predictSigmaPoints(sig_points , Xsig_pred_ , delta_t);
   //calculate the mean
   x_.fill(0);
   for(int i = 0 ; i < weights_.size() ; i++){
-    x_ += weights_(i) * pred_sig_points.col(i);
+    x_ += weights_(i) * Xsig_pred_.col(i);
   }
   //calculate co-variance
   P_.fill(0);
   for(int i =0; i < weights_.size(); i++){
-      VectorXd diff = pred_sig_points.col(i)  - x_;
+      VectorXd diff = Xsig_pred_.col(i)  - x_;
       //normalize angles
       while(diff(3) > M_PI) diff(3) -= 2.0*M_PI;
       while(diff(3) < -M_PI) diff(3) += 2.0*M_PI;
@@ -195,6 +194,32 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
   */
+    int n_z = 2;
+    MatrixXd z_sig = MatrixXd (n_z , 2*n_aug_ + 1);
+    VectorXd z_pred = VectorXd(n_z);
+    MatrixXd S = MatrixXd(n_z,n_z);
+    S.fill(0);
+    z_pred.fill(0);
+    
+    for(int i = 0; i < 2*n_aug_ + 1; i++){
+        double px = Xsig_pred_(0,i);
+        double py = Xsig_pred_(1,i);
+        z_sig(0,i) = px;
+        z_sig(1,i) = py;
+    }
+    
+    for(int i = 0; i < 2*n_aug_ + 1; i++){
+        z_pred += weights_(i) * z_sig.col(i);
+    }
+    
+    for(int i = 0; i < 2*n_aug_ + 1; i++){
+        VectorXd diff = VectorXd(n_z);
+        diff = z_sig.col(i) - z_pred;
+        S += weights_(i) * diff * diff.transpose();
+    }
+    
+    S += R_lidar;
+    
 }
 
 /**
@@ -210,6 +235,40 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
   */
+    int n_z = 3;
+    MatrixXd z_sig = MatrixXd (n_z , 2*n_aug_ + 1);
+    VectorXd z_pred = VectorXd(n_z);
+    MatrixXd S = MatrixXd(n_z,n_z);
+    S.fill(0);
+    z_pred.fill(0);
+    
+    for(int i = 0; i < 2*n_aug_ + 1; i++){
+        
+        double px = Xsig_pred_(0,i);
+        double py = Xsig_pred_(1,i);
+        double v = Xsig_pred_(2,i);
+        double phi = Xsig_pred_(3,i);
+   
+        z_sig(0,i) = sqrt(px*px + py*py);
+        z_sig(1,i) = atan2(py,px);
+        z_sig(2,i) = ( px * cos(phi) + py * sin(phi) ) / sqrt(px * px + py * py);
+    }
+    
+    for(int i = 0; i < 2*n_aug_ + 1; i++){
+        z_pred += weights_(i) * z_sig.col(i);
+    }
+    
+    for(int i = 0; i < 2*n_aug_ + 1; i++){
+        VectorXd diff = VectorXd(n_z);
+        diff = z_sig.col(i) - z_pred;
+        
+        while(diff(1) > M_PI) diff(1) -= 2*M_PI;
+        while(diff(1) < -M_PI) diff(1) += 2*M_PI;
+        S += weights_(i) * diff * diff.transpose();
+    }
+    
+    S += R_radar;
+    
 }
 void UKF::generateSigmaPoints(const VectorXd x_aug , MatrixXd &sig_points){
     MatrixXd p_aug = MatrixXd(n_aug_ , n_aug_);
