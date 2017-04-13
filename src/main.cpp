@@ -158,7 +158,9 @@ int main(int argc, char* argv[]) {
 
   for (size_t k = 0; k < number_of_measurements; ++k) {
     // Call the UKF-based fusion
+     cout<< "processing measurement"<<endl;
     ukf.ProcessMeasurement(measurement_pack_list[k]);
+     cout<< "Processed measurement"<<endl;
 
     // output the estimation
     out_file_ << ukf.x_(0) << "\t"; // pos1 - est
