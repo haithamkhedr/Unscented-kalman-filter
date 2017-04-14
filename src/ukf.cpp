@@ -12,7 +12,7 @@ using std::vector;
 /**
  * Initializes Unscented Kalman filter
  */
-UKF::UKF() {
+UKF::UKF(){
   // if this is false, laser measurements will be ignored (except during init)
   is_initialized_ = false;
   use_laser_ = true;
@@ -30,19 +30,24 @@ UKF::UKF() {
 
   // initial covariance matrix
   P_ = MatrixXd(n_x_, n_x_);
-  P_.fill(0);
-  P_(0,0) = 0;
-  P_(1,1) = 0;
-  P_(2,2) = 0;
-  P_(3,3) = 0;
-  P_(4,4) = 0;
-
+ // P_.fill(0);
+ // P_(0,0) = 1;
+ // P_(1,1) = 1;
+ // P_(2,2) = 1;
+ // P_(3,3) = 1;
+ // P_(4,4) = 1;
+P_ <<     0.0043,   -0.0013,    0.0030,   -0.0022,   -0.0020,
+          -0.0013,    0.0077,    0.0011,    0.0071,    0.0060,
+           0.0030,    0.0011,    0.0054,    0.0007,    0.0008,
+          -0.0022,    0.0071,    0.0007,    0.0098,    0.0100,
+          -0.0020,    0.0060,    0.0008,    0.0100,    0.0123;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 0.78;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 0.65; 
+
   Q_  = MatrixXd(2,2);
   Q_ << std_a_ , 0,
        0     , std_yawdd_ ;
@@ -96,21 +101,21 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if(! is_initialized_){
       if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == true){
           
-          float rho = meas_package.raw_measurements_[0];
-          float phi = meas_package.raw_measurements_[1];
-          float rhodot = meas_package.raw_measurements_[2];
+          double rho = meas_package.raw_measurements_[0];
+          double phi = meas_package.raw_measurements_[1];
+          double rhodot = meas_package.raw_measurements_[2];
 
           x_(0) = rho * cos(phi);
           x_(1) = rho * sin(phi);
-          x_(2) = 0;//rhodot;
-          x_(3) = 0;//phi;
+          x_(2) = 0;
+          x_(3) = 0;
           x_(4) = 0;
       }
 
       else if(meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == true){
           
-          float px = meas_package.raw_measurements_[0];
-          float py = meas_package.raw_measurements_[1];
+          double px = meas_package.raw_measurements_[0];
+          double py = meas_package.raw_measurements_[1];
           
           if(px == 0)
               px = 1e-5;
@@ -129,21 +134,19 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   }
     
    double dt = (meas_package.timestamp_ - time_us_) * 1e-6;
-   //cout<<"Measurement time: " << meas_package.timestamp_ * 1e-6 << "last measurement time: " << time_us_ * 1e-6<<" dt: " <<dt<<endl;
    if( use_radar_ || use_laser_ ){
        
-       cout<<"Started Prediction"<<endl;
-       cout<<"state<<"<<endl<<x_<<endl;
+       //cout<<"Started Prediction"<<endl;
        Prediction(dt);
-       cout<<"Predicted state<<"<<endl<<x_<<endl;
+       //cout<<"Predicted state<<"<<endl<<x_<<endl;
        
        if(meas_package.sensor_type_ == MeasurementPackage::RADAR){
            UpdateRadar(meas_package);
-           cout<<"After Radar Measurement state<<"<<endl<<x_<<endl;
+           //cout<<"After Radar Measurement state<<"<<endl<<x_<<endl;
        }
         if(meas_package.sensor_type_ == MeasurementPackage::LASER){
            UpdateLidar(meas_package);
-             cout<<"After Lidar Measurement state<<"<<endl<<x_<<endl;
+             //cout<<"After Lidar Measurement state<<"<<endl<<x_<<endl;
        }
    }
     
@@ -172,7 +175,7 @@ void UKF::Prediction(double delta_t) {
   x_aug(n_x_ + 1) = 0;
   generateSigmaPoints(x_aug , sig_points);
     
-  cout<<"Genereated Sigma Points<<"<<endl<<sig_points<<endl;    
+  //cout<<"Genereated Sigma Points<<"<<endl<<sig_points<<endl;    
   predictSigmaPoints(sig_points , Xsig_pred_ , delta_t);
   //calculate the mean
   x_.fill(0);
@@ -246,7 +249,10 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
       K = T * S.inverse();
       x_ = x_ + K*(z_meas -z_pred);
       P_ = P_ - K*S*K.transpose();
-        
+      
+     //Calculate NIS 
+     VectorXd diff = (z_meas - z_pred);
+     NIS_laser_ = diff.transpose() * S.inverse() * diff;  
     
 }
 
@@ -323,6 +329,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         //cout<<"diff: "<<endl<<diff<<endl;
         x_ = x_ + K*diff;
         P_ = P_ - K*S*K.transpose();
+        NIS_radar_ = diff.transpose() * S.inverse() * diff;
     
 }
 void UKF::generateSigmaPoints(const VectorXd x_aug , MatrixXd &sig_points){

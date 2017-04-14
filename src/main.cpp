@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
       gt_package.gt_values_ << x_gt, y_gt, vx_gt, vy_gt;
       gt_pack_list.push_back(gt_package);
   }
-
+  
   // Create a UKF instance
   UKF ukf;
 
@@ -158,9 +158,9 @@ int main(int argc, char* argv[]) {
 
   for (size_t k = 0; k < number_of_measurements; ++k) {
     // Call the UKF-based fusion
-     cout<< "processing measurement"<<endl;
+     //cout<< "processing measurement"<<endl;
     ukf.ProcessMeasurement(measurement_pack_list[k]);
-     cout<< "Processed measurement"<<endl;
+     //cout<< "Processed measurement"<<endl;
 
     // output the estimation
     out_file_ << ukf.x_(0) << "\t"; // pos1 - est
@@ -219,7 +219,6 @@ int main(int argc, char* argv[]) {
   // compute the accuracy (RMSE)
   Tools tools;
   cout << "Accuracy - RMSE:" << endl << tools.CalculateRMSE(estimations, ground_truth) << endl;
-
   // close files
   if (out_file_.is_open()) {
     out_file_.close();
@@ -232,3 +231,4 @@ int main(int argc, char* argv[]) {
   cout << "Done!" << endl;
   return 0;
 }
+
