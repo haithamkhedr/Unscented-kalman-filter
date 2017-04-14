@@ -48,10 +48,6 @@ P_ <<     0.0043,   -0.0013,    0.0030,   -0.0022,   -0.0020,
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = 0.65; 
 
-  Q_  = MatrixXd(2,2);
-  Q_ << std_a_ , 0,
-       0     , std_yawdd_ ;
-
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
 

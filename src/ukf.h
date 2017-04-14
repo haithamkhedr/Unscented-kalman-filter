@@ -40,7 +40,6 @@ public:
 
   ///* Process noise standard deviation yaw acceleration in rad/s^2
   double std_yawdd_;
-  MatrixXd Q_;
 
   ///* Laser measurement noise standard deviation position1 in m
   double std_laspx_;
