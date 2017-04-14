@@ -62,10 +62,10 @@ P_ <<     0.0043,   -0.0013,    0.0030,   -0.0022,   -0.0020,
   std_radr_ = 0.3;
 
   // Radar measurement noise standard deviation angle in rad
-  std_radphi_ = 0.0175;
+  std_radphi_ = 0.03;
 
   // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_ = 0.1;
+  std_radrd_ = 0.3;
 
   /**
   TODO:
@@ -103,7 +103,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
           
           double rho = meas_package.raw_measurements_[0];
           double phi = meas_package.raw_measurements_[1];
-          double rhodot = meas_package.raw_measurements_[2];
 
           x_(0) = rho * cos(phi);
           x_(1) = rho * sin(phi);
@@ -117,9 +116,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
           double px = meas_package.raw_measurements_[0];
           double py = meas_package.raw_measurements_[1];
           
-          if(px == 0)
+          if(fabs(px) < 1e-3)
               px = 1e-5;
-          if(py == 0)
+          if(fabs(py) < 1e-3)
               py = 1e-5;
           
           x_(0) = px ;
@@ -140,11 +139,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
        Prediction(dt);
        //cout<<"Predicted state<<"<<endl<<x_<<endl;
        
-       if(meas_package.sensor_type_ == MeasurementPackage::RADAR){
+       if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_){
            UpdateRadar(meas_package);
            //cout<<"After Radar Measurement state<<"<<endl<<x_<<endl;
        }
-        if(meas_package.sensor_type_ == MeasurementPackage::LASER){
+        if(meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_){
            UpdateLidar(meas_package);
              //cout<<"After Lidar Measurement state<<"<<endl<<x_<<endl;
        }
@@ -240,6 +239,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
     
     for(int i = 0; i < 2*n_aug_ + 1; i++){
         VectorXd diff = Xsig_pred_.col(i) - x_;
+        while (diff(3)> M_PI) diff(3)-=2.*M_PI;
+        while (diff(3)<-M_PI) diff(3)+=2.*M_PI;
         VectorXd diff_meas = z_sig.col(i) - z_pred;
         
         T += weights_(i) * diff * diff_meas.transpose();
@@ -303,8 +304,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         VectorXd diff = VectorXd(n_z);
         diff = z_sig.col(i) - z_pred;
         
-        while(diff(1) > M_PI) diff(1) -= 2*M_PI;
-        while(diff(1) < -M_PI) diff(1) += 2*M_PI;
+        while(diff(1) > M_PI) diff(1) -= 2.*M_PI;
+        while(diff(1) < -M_PI) diff(1) += 2.*M_PI;
         S += weights_(i) * diff * diff.transpose();
     }
     
@@ -313,19 +314,20 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
      for(int i = 0; i < 2*n_aug_ + 1; i++){
         VectorXd diff = Xsig_pred_.col(i) - x_;
         VectorXd diff_meas = z_sig.col(i) - z_pred;
-        while(diff(1) > M_PI) diff(1) -= 2*M_PI;
-        while(diff(1) < -M_PI) diff(1) += 2*M_PI;
+
+        while(diff(3) > M_PI) diff(3) -= 2.*M_PI;
+        while(diff(3) < -M_PI) diff(3) += 2.*M_PI;
          
-        while(diff_meas(1) > M_PI) diff_meas(1) -= 2*M_PI;
-        while(diff_meas(1) < -M_PI) diff_meas(1) += 2*M_PI;
+        while(diff_meas(1) > M_PI) diff_meas(1) -= 2.*M_PI;
+        while(diff_meas(1) < -M_PI) diff_meas(1) += 2.*M_PI;
          
         T += weights_(i) * diff * diff_meas.transpose();
          
     }
         K = T * S.inverse();
         VectorXd diff = (z_meas -z_pred);
-        while(diff(1) > M_PI) diff(1) -= 2*M_PI;
-        while(diff(1) < -M_PI) diff(1) += 2*M_PI;
+        while(diff(1) > M_PI) diff(1) -= 2.*M_PI;
+        while(diff(1) < -M_PI) diff(1) += 2.*M_PI;
         //cout<<"diff: "<<endl<<diff<<endl;
         x_ = x_ + K*diff;
         P_ = P_ - K*S*K.transpose();

@@ -18,8 +18,8 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
     Eigen::VectorXd sum(estimations[0].size());
     sum.fill(0);
     for(int i=0; i < estimations.size(); i++){
-        Eigen::VectorXd err = (estimations[i] - ground_truth[i]);
-        sum += (err.array()*err.array()).matrix();
+        Eigen::VectorXd err = (estimations[i] - ground_truth[i]).array().pow(2);
+        sum += err;
     }
     return (sum / estimations.size()).array().sqrt();
 }
